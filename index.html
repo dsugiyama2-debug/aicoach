@@ -181,6 +181,9 @@
         <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5（高速・低コスト）</option>
         <option value="claude-opus-4-8">Claude Opus 4.8（最高品質・高コスト）</option>
       </select>
+      <label>背景情報（あなたのプロフィール・状況）</label>
+      <textarea id="profileInput" placeholder="役職・研究テーマ・チーム状況・目標など。ここに書いた内容をコーチが毎回踏まえて対話します。"></textarea>
+      <div class="hint">🔒 この欄はこの端末のブラウザ内にのみ保存され、公開URL（GitHub上のファイル）には一切含まれません。機密情報を書いても外部には出ません。</div>
       <label>コーチの人格（システムプロンプト）</label>
       <textarea id="systemPromptInput"></textarea>
       <button class="btn primary" onclick="saveSettings()">設定を保存</button>
@@ -273,7 +276,7 @@ const store = {
   set(key, val) { localStorage.setItem('aicoach_' + key, JSON.stringify(val)); }
 };
 
-let settings = store.get('settings', { apiKey: '', model: 'claude-sonnet-4-5', systemPrompt: DEFAULT_SYSTEM_PROMPT });
+let settings = store.get('settings', { apiKey: '', model: 'claude-sonnet-4-5', systemPrompt: DEFAULT_SYSTEM_PROMPT, profile: '' });
 let sessions = store.get('sessions', []);   // [{id, title, createdAt, messages:[{role, content}]}]
 let goals    = store.get('goals', []);      // [{id, text, done, createdAt}]
 let logs     = store.get('logs', []);       // [{id, text, date}]
@@ -397,6 +400,9 @@ function renderLogs() {
 /* ---------- コーチのコンテキスト構築 ---------- */
 function buildSystemPrompt() {
   let sp = settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  if (settings.profile && settings.profile.trim()) {
+    sp += '\n\n【利用者の背景情報（本人が登録したプロフィール。機密のため対話内でのみ活用し、要約や引用を外部に出さないこと）】\n' + settings.profile.trim();
+  }
   const activeGoals = goals.filter(g => !g.done);
   const doneGoals = goals.filter(g => g.done).slice(0, 5);
   const recentLogs = logs.slice(0, 10);
@@ -503,17 +509,19 @@ $('inputText').addEventListener('input', function () {
 function loadSettingsUI() {
   $('apiKeyInput').value = settings.apiKey || '';
   $('modelSelect').value = settings.model || 'claude-sonnet-4-5';
+  $('profileInput').value = settings.profile || '';
   $('systemPromptInput').value = settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
 }
 function saveSettings() {
   settings.apiKey = $('apiKeyInput').value.trim();
   settings.model = $('modelSelect').value;
+  settings.profile = $('profileInput').value.trim();
   settings.systemPrompt = $('systemPromptInput').value.trim() || DEFAULT_SYSTEM_PROMPT;
   store.set('settings', settings);
   toast('設定を保存しました');
 }
 function exportData() {
-  const data = { exportedAt: new Date().toISOString(), sessions, goals, logs, systemPrompt: settings.systemPrompt };
+  const data = { exportedAt: new Date().toISOString(), sessions, goals, logs, systemPrompt: settings.systemPrompt, profile: settings.profile };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
