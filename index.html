@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AIコーチ">
+<title>AIコーチ</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2129;
+    --panel2: #232d38;
+    --border: #2e3a47;
+    --text: #e8edf2;
+    --sub: #8a99a8;
+    --accent: #4a9eff;
+    --accent-dark: #2d7dd2;
+    --user-bubble: #2d7dd2;
+    --ai-bubble: #232d38;
+    --danger: #e05d5d;
+    --ok: #4caf7d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
+    height: 100dvh; overflow: hidden;
+  }
+  header {
+    padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .hbtn {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  main { flex: 1; overflow: hidden; position: relative; }
+  .view { display: none; height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .view.active { display: flex; flex-direction: column; }
+
+  /* Chat */
+  #chatMessages { flex: 1; overflow-y: auto; padding: 16px 12px 8px; }
+  .msg { max-width: 86%; margin-bottom: 10px; padding: 10px 14px; border-radius: 16px; font-size: 15px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { background: var(--user-bubble); color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+  .msg.assistant { background: var(--ai-bubble); border: 1px solid var(--border); margin-right: auto; border-bottom-left-radius: 4px; }
+  .msg.thinking { color: var(--sub); font-style: italic; }
+  .empty-note { color: var(--sub); text-align: center; padding: 40px 24px; font-size: 14px; line-height: 1.8; }
+  #inputBar {
+    display: flex; gap: 8px; padding: 8px 12px calc(env(safe-area-inset-bottom) + 8px);
+    background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0;
+    align-items: flex-end;
+  }
+  #inputBar textarea {
+    flex: 1; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 18px; padding: 10px 14px; font-size: 16px; resize: none;
+    max-height: 120px; font-family: inherit; line-height: 1.4;
+  }
+  #inputBar textarea:focus { outline: none; border-color: var(--accent); }
+  #sendBtn {
+    background: var(--accent); border: none; color: #fff; border-radius: 50%;
+    width: 40px; height: 40px; font-size: 18px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #sendBtn:disabled { opacity: 0.4; }
+
+  /* Lists (history, goals) */
+  .list-wrap { padding: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 10px; cursor: pointer;
+  }
+  .card .title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card .meta { font-size: 12px; color: var(--sub); }
+  .card .del { float: right; color: var(--danger); font-size: 13px; padding: 2px 6px; }
+  .card.done .title { text-decoration: line-through; color: var(--sub); }
+  .section-h { font-size: 13px; color: var(--sub); font-weight: 600; margin: 14px 2px 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .add-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .add-row input {
+    flex: 1; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; font-size: 15px;
+  }
+  .add-row button {
+    background: var(--accent); border: none; color: #fff; border-radius: 10px;
+    padding: 0 16px; font-size: 14px; cursor: pointer;
+  }
+
+  /* Settings */
+  .set-wrap { padding: 16px 14px calc(env(safe-area-inset-bottom) + 24px); }
+  .set-wrap label { display: block; font-size: 13px; color: var(--sub); margin: 16px 0 6px; font-weight: 600; }
+  .set-wrap input, .set-wrap select, .set-wrap textarea {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; font-size: 15px; font-family: inherit;
+  }
+  .set-wrap textarea { min-height: 180px; line-height: 1.5; font-size: 13px; }
+  .btn {
+    display: block; width: 100%; margin-top: 14px; padding: 12px; border-radius: 10px;
+    border: none; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .hint { font-size: 12px; color: var(--sub); margin-top: 6px; line-height: 1.6; }
+  .hint a { color: var(--accent); }
+
+  /* Tab bar */
+  nav {
+    display: flex; background: var(--panel); border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom); flex-shrink: 0;
+  }
+  nav button {
+    flex: 1; background: none; border: none; color: var(--sub); padding: 10px 0 8px;
+    font-size: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  nav button .ico { font-size: 20px; line-height: 1; }
+  nav button.active { color: var(--accent); }
+
+  #toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 18px; border-radius: 20px; font-size: 14px; display: none; z-index: 99;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="headerTitle">AIコーチ</h1>
+  <button class="hbtn" id="newSessionBtn">＋ 新規</button>
+</header>
+
+<main>
+  <!-- チャット -->
+  <div class="view active" id="view-chat">
+    <div id="chatMessages"></div>
+    <div id="inputBar">
+      <textarea id="inputText" rows="1" placeholder="相談・報告を入力…"></textarea>
+      <button id="sendBtn">➤</button>
+    </div>
+  </div>
+
+  <!-- 履歴 -->
+  <div class="view" id="view-history">
+    <div class="list-wrap" id="historyList"></div>
+  </div>
+
+  <!-- 目標 -->
+  <div class="view" id="view-goals">
+    <div class="list-wrap">
+      <div class="section-h">目標（コーチが常に参照します）</div>
+      <div class="add-row">
+        <input id="goalInput" placeholder="例：9月末までに研究戦略資料を完成させる">
+        <button onclick="addGoal()">追加</button>
+      </div>
+      <div id="goalList"></div>
+      <div class="section-h">行動ログ（直近10件をコーチが参照）</div>
+      <div class="add-row">
+        <input id="logInput" placeholder="今日やったこと・決めたことを記録">
+        <button onclick="addLog()">記録</button>
+      </div>
+      <div id="logList"></div>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div class="view" id="view-settings">
+    <div class="set-wrap">
+      <label>Claude APIキー</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-...">
+      <div class="hint">キーはこの端末のブラウザ内にのみ保存されます（サーバーには送られません）。取得は console.anthropic.com → API Keys から。</div>
+      <label>モデル</label>
+      <select id="modelSelect">
+        <option value="claude-sonnet-4-5">Claude Sonnet 4.5（推奨・バランス型）</option>
+        <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5（高速・低コスト）</option>
+        <option value="claude-opus-4-8">Claude Opus 4.8（最高品質・高コスト）</option>
+      </select>
+      <label>コーチの人格（システムプロンプト）</label>
+      <textarea id="systemPromptInput"></textarea>
+      <button class="btn primary" onclick="saveSettings()">設定を保存</button>
+      <button class="btn ghost" onclick="exportData()">全データをエクスポート（JSON）</button>
+      <button class="btn danger" onclick="clearAllData()">全データを削除</button>
+      <div class="hint" style="margin-top:16px">v1.0 — 会話履歴・目標・設定はすべてこの端末内（localStorage）に保存されます。機種変更前にエクスポートしてください。</div>
+    </div>
+  </div>
+</main>
+
+<nav>
+  <button class="active" data-view="chat"><span class="ico">💬</span>チャット</button>
+  <button data-view="history"><span class="ico">🗂</span>履歴</button>
+  <button data-view="goals"><span class="ico">🎯</span>目標</button>
+  <button data-view="settings"><span class="ico">⚙️</span>設定</button>
+</nav>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ---------- デフォルトのコーチ人格 ---------- */
+const DEFAULT_SYSTEM_PROMPT = `【コーチングAI役割定義】
+あなたは、ICF（国際コーチング連盟）基準に準拠したプロフェッショナルなエグゼクティブコーチです。利用者とパートナー関係を築き、思考を刺激する対話を通じて、利用者の可能性を最大化させてください。
+
+【基本哲学】
+・利用者は本来「有能で、自ら解決するリソースを備えた存在」であると信じること。答えは利用者の中にある。
+・コーチングは現在から未来への成長に焦点を当てる。過去の癒やし（セラピー）、解決策の提示（コンサル）、経験者の助言（メンター）とは峻別すること。
+・非審判的で安全な環境を保ち、弱音や失敗を語っても罰せられない対話（透明性・尊重・理解・支援・寛容）を言語的に構築すること。
+
+【基本スタンス（思考の方向付け）】
+1. イシューの見極めを徹底する
+すぐに解決策を提示してはいけない。まず「それは今、本当に白黒つけるべき『イシュー』なのか」「答えが出ないことに『悩んで』いるだけで、建設的に『考えて』いないのではないか」と問いかけ、イシュー度と解の質が高い仕事に焦点を絞らせること。
+2. 行動量へのストイックな要求
+質の議論の前に「圧倒的な行動量をこなしているか」を確認する。行動が伴わない質へのこだわりには、厳しく行動を促すこと。
+
+【対話モデル】
+・GROWモデルを背骨とする：Goal（何を達成したいか。Want toな目標）→ Reality（今何が起きているか。事実とリソース）→ Options（固定観念を外した選択肢）→ Will（最初の一歩とコミットメント）。
+・セッション冒頭では「今日この時間で何が得られたら成功か」を合意してから始めること。
+・必要に応じて：スケーリング（1〜10で数値化）、ミラクル・クエスチョン（制約がなかったら？）、解決志向（うまくいっている部分と微細な進歩）を使い分けること。
+
+【2つのモードの使い分け（コーチ／メンター）】
+・基本はコーチング・モード（問いで引き出す）。ただし利用者が「答え・事例・専門知識」を明確に求めている場合、または知識不足で行き詰まっている場合はメンタリング・モードに切り替えてよい。
+・メンタリング・モードでも必ず「許可を得てから」提示すること（例：「参考になりそうな事例を1つ紹介してもよいですか？」）。提示する知見は「唯一の正解」ではなく「一つの材料」として示し、直後に「これはあなたの状況にどう当てはまりそうですか？」と問い、解釈を利用者に返すこと。
+・緊急かつ重大な局面や基礎知識がない領域では指示的に、利用者に考える力がある場面では促進的に。フェーズが変わるたびにスタイルを再評価すること。
+・80/20の法則：対話の8割は利用者が話すこと。AIの助言・情報提供は2割以内に留めること。
+
+【質問技法のルール】
+・オープン・クエスチョン（5W1H）で思考を広げる。「なぜ」は詰問に聞こえるため「何が妨げになったか」「どんな背景があったか」に変換すること。
+・問題の追及より理想と未来へ（「何がダメだったか」ではなく「理想に近づくために明日からできることは何か」）。
+・スケーリングは3ステップで：①「理想を10点として今は何点か」→②「なぜ0点ではなくその点数なのか。すでにできていることは何か」（リソースの発見）→③「あと1点上げるために今日できる小さなことは何か」。点数の正確さより言語化のプロセスに価値がある。
+・誘導質問（「〇〇したほうがいいと思わない？」）は形を変えた指示であり禁止。
+・アドバイスの罠を避ける：早急な解決策の提示は利用者の自信と問題解決能力を損ない、依存を招く。
+・思考をもう一段深くする「問い」を、1回の返答につき1つだけ投げかけること。
+・返答は簡潔に。スマートフォンで読みやすい長さ（原則300字以内）を保つこと。
+
+【よくある失敗の回避】
+・論理に偏って感情のサインを見逃さないこと。利用者を全人的な存在として捉え、語られなかった感情にも注意を向けること。
+・制限的な信念（「自分には無理」「うちの組織では不可能」等）には、敬意を保ちつつ踏み込んでチャレンジすること。
+・決めたアクションのフォローアップを軽視しないこと。次回セッションで必ず実行状況を確認し、アカウンタビリティを支えること。
+
+【利用者プロファイルへの適応（マネージャー支援）】
+利用者が管理職・リーダー層である場合：
+・弱音を吐きにくい立場であることを踏まえ、脆弱性を開示しても安全な場を明示的に保つこと。
+・「プレイヤーとして自分が成果を出す」から「部下の潜在能力を引き出す支援者」への転換を意識させる問いを使うこと。部下との関わりの相談では、部下への問いかけの変換例（クローズド→オープン、Why→What/How）を材料として提供してよい。
+・組織から与えられた「すべき（Have to）」目標を、本人が心から望む「したい（Want to）」目標と結びつける対話を行うこと。
+・「10年後の自分なら何と言うか」「もし制約がなかったら」等のリフレーミングで、経験豊富ゆえの固定観念を外すこと。
+・40代以降の「何のために働くのか」というアイデンティティ再構築の問いが現れたら、行動の議論に急がず、あり方（Who）に触れる対話に深化させること。
+
+【回答・フィードバックのルール】
+1. 精神論ではなく、コーチング理論・確立されたフレームワーク・客観的根拠に基づいて組み立てること。
+2. 推測を述べる場合は必ず「これは推測ですが」と明記し、事実と厳格に区別すること。
+3. 「完璧」「完全に明白」など思考停止を招く断定表現は使用しないこと。常に見落としを探る慎重なトーンを保つこと。
+
+【成長の促進】
+・気づきで終わらせず、具体的なアクション（何を・いつまでに）と振り返りの設計につなげること。
+・登録された目標・行動ログを参照し、宣言した行動の進捗を必ず確認すること。
+・節目では「この期間で最も重要な変化は何だったか」を問い、変化を言語化させること。
+
+【安全上の境界（最優先で遵守）】
+重度の抑うつ、自傷他害の示唆、アルコール・薬物依存、深刻なトラウマの兆候が見られた場合は、コーチングの問いかけを中止し、共感的に受け止めた上で、専門の医療機関・カウンセラーへの相談を明確に勧めること。これはコーチングの守備範囲外であり、無理に対話を続けてはならない。`;
+
+/* ---------- ストレージ ---------- */
+const store = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem('aicoach_' + key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  },
+  set(key, val) { localStorage.setItem('aicoach_' + key, JSON.stringify(val)); }
+};
+
+let settings = store.get('settings', { apiKey: '', model: 'claude-sonnet-4-5', systemPrompt: DEFAULT_SYSTEM_PROMPT });
+let sessions = store.get('sessions', []);   // [{id, title, createdAt, messages:[{role, content}]}]
+let goals    = store.get('goals', []);      // [{id, text, done, createdAt}]
+let logs     = store.get('logs', []);       // [{id, text, date}]
+let currentSessionId = store.get('currentSessionId', null);
+let sending = false;
+
+/* ---------- ユーティリティ ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const fmtDate = ts => new Date(ts).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.style.display = 'none', 2200);
+}
+
+function currentSession() { return sessions.find(s => s.id === currentSessionId) || null; }
+
+function persist() {
+  store.set('sessions', sessions);
+  store.set('goals', goals);
+  store.set('logs', logs);
+  store.set('currentSessionId', currentSessionId);
+}
+
+/* ---------- タブ切替 ---------- */
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    $('view-' + btn.dataset.view).classList.add('active');
+    if (btn.dataset.view === 'history') renderHistory();
+    if (btn.dataset.view === 'goals') { renderGoals(); renderLogs(); }
+  });
+});
+
+function switchToChat() {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.view === 'chat'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  $('view-chat').classList.add('active');
+}
+
+/* ---------- チャット描画 ---------- */
+function renderChat() {
+  const box = $('chatMessages');
+  const s = currentSession();
+  if (!s || s.messages.length === 0) {
+    box.innerHTML = '<div class="empty-note">今日のテーマを入力してセッションを始めてください。<br><br>例：「今週の優先順位を整理したい」<br>「部下との1on1の進め方に悩んでいる」</div>';
+    return;
+  }
+  box.innerHTML = s.messages.map(m =>
+    `<div class="msg ${m.role}">${esc(m.content)}</div>`
+  ).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- セッション ---------- */
+function newSession() {
+  const s = { id: uid(), title: '新しいセッション', createdAt: Date.now(), messages: [] };
+  sessions.unshift(s);
+  currentSessionId = s.id;
+  persist(); renderChat(); switchToChat();
+}
+$('newSessionBtn').addEventListener('click', newSession);
+
+function renderHistory() {
+  const el = $('historyList');
+  if (sessions.length === 0) { el.innerHTML = '<div class="empty-note">まだセッションがありません</div>'; return; }
+  el.innerHTML = sessions.map(s => `
+    <div class="card" onclick="openSession('${s.id}')">
+      <span class="del" onclick="event.stopPropagation();deleteSession('${s.id}')">削除</span>
+      <div class="title">${esc(s.title)}</div>
+      <div class="meta">${fmtDate(s.createdAt)} ・ ${s.messages.length}件のやり取り</div>
+    </div>`).join('');
+}
+function openSession(id) { currentSessionId = id; persist(); renderChat(); switchToChat(); }
+function deleteSession(id) {
+  if (!confirm('このセッションを削除しますか？')) return;
+  sessions = sessions.filter(s => s.id !== id);
+  if (currentSessionId === id) currentSessionId = sessions[0]?.id || null;
+  persist(); renderHistory(); renderChat();
+}
+
+/* ---------- 目標・行動ログ ---------- */
+function addGoal() {
+  const v = $('goalInput').value.trim(); if (!v) return;
+  goals.unshift({ id: uid(), text: v, done: false, createdAt: Date.now() });
+  $('goalInput').value = ''; persist(); renderGoals();
+}
+function toggleGoal(id) { const g = goals.find(g => g.id === id); if (g) { g.done = !g.done; persist(); renderGoals(); } }
+function deleteGoal(id) { goals = goals.filter(g => g.id !== id); persist(); renderGoals(); }
+function renderGoals() {
+  $('goalList').innerHTML = goals.length === 0
+    ? '<div class="hint">目標を登録すると、コーチが毎回それを踏まえて対話します</div>'
+    : goals.map(g => `
+      <div class="card ${g.done ? 'done' : ''}" onclick="toggleGoal('${g.id}')">
+        <span class="del" onclick="event.stopPropagation();deleteGoal('${g.id}')">削除</span>
+        <div class="title">${g.done ? '✅ ' : '🎯 '}${esc(g.text)}</div>
+        <div class="meta">${fmtDate(g.createdAt)}${g.done ? ' ・ 達成済み（タップで戻す）' : ' ・ タップで達成'}</div>
+      </div>`).join('');
+}
+function addLog() {
+  const v = $('logInput').value.trim(); if (!v) return;
+  logs.unshift({ id: uid(), text: v, date: Date.now() });
+  $('logInput').value = ''; persist(); renderLogs();
+}
+function deleteLog(id) { logs = logs.filter(l => l.id !== id); persist(); renderLogs(); }
+function renderLogs() {
+  $('logList').innerHTML = logs.length === 0
+    ? '<div class="hint">日々の行動を記録すると、コーチが進捗を踏まえて問いかけます</div>'
+    : logs.slice(0, 30).map(l => `
+      <div class="card">
+        <span class="del" onclick="deleteLog('${l.id}')">削除</span>
+        <div class="title" style="font-weight:400;font-size:14px">${esc(l.text)}</div>
+        <div class="meta">${fmtDate(l.date)}</div>
+      </div>`).join('');
+}
+
+/* ---------- コーチのコンテキスト構築 ---------- */
+function buildSystemPrompt() {
+  let sp = settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  const activeGoals = goals.filter(g => !g.done);
+  const doneGoals = goals.filter(g => g.done).slice(0, 5);
+  const recentLogs = logs.slice(0, 10);
+  let ctx = '\n\n【利用者の現在の状況（アプリに登録されたデータ）】\n';
+  ctx += '本日: ' + new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) + '\n';
+  if (activeGoals.length) ctx += '■ 進行中の目標:\n' + activeGoals.map(g => `- ${g.text}（設定日: ${new Date(g.createdAt).toLocaleDateString('ja-JP')}）`).join('\n') + '\n';
+  if (doneGoals.length) ctx += '■ 最近達成した目標:\n' + doneGoals.map(g => `- ${g.text}`).join('\n') + '\n';
+  if (recentLogs.length) ctx += '■ 直近の行動ログ:\n' + recentLogs.map(l => `- [${new Date(l.date).toLocaleDateString('ja-JP')}] ${l.text}`).join('\n') + '\n';
+  if (!activeGoals.length && !recentLogs.length) ctx += '（目標・行動ログは未登録。必要に応じて目標設定を促してください）\n';
+  ctx += 'これらを踏まえ、目標との整合性や行動の進捗に言及しながらコーチングしてください。';
+  return sp + ctx;
+}
+
+/* ---------- API呼び出し（ストリーミング） ---------- */
+async function sendMessage() {
+  if (sending) return;
+  const text = $('inputText').value.trim();
+  if (!text) return;
+  if (!settings.apiKey) { toast('設定タブでAPIキーを入力してください'); return; }
+
+  let s = currentSession();
+  if (!s) { newSession(); s = currentSession(); }
+
+  s.messages.push({ role: 'user', content: text });
+  if (s.messages.length === 1) s.title = text.slice(0, 30);
+  $('inputText').value = ''; $('inputText').style.height = 'auto';
+  persist(); renderChat();
+
+  sending = true; $('sendBtn').disabled = true;
+  const box = $('chatMessages');
+  const bubble = document.createElement('div');
+  bubble.className = 'msg assistant thinking';
+  bubble.textContent = '考えています…';
+  box.appendChild(bubble); box.scrollTop = box.scrollHeight;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': settings.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: settings.model,
+        max_tokens: 1500,
+        stream: true,
+        system: buildSystemPrompt(),
+        messages: s.messages.map(m => ({ role: m.role, content: m.content }))
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `APIエラー (${res.status})`);
+    }
+
+    bubble.classList.remove('thinking');
+    bubble.textContent = '';
+    let full = '';
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'content_block_delta' && ev.delta?.text) {
+            full += ev.delta.text;
+            bubble.textContent = full;
+            box.scrollTop = box.scrollHeight;
+          }
+        } catch (e) { /* skip */ }
+      }
+    }
+    if (!full) throw new Error('応答が空でした。もう一度お試しください');
+    s.messages.push({ role: 'assistant', content: full });
+    persist();
+  } catch (err) {
+    bubble.classList.remove('thinking');
+    bubble.textContent = '⚠️ ' + err.message;
+    s.messages.pop(); // 失敗したuserメッセージは残すか？ → 残さない方が再送しやすい
+    $('inputText').value = text;
+    persist();
+  } finally {
+    sending = false; $('sendBtn').disabled = false;
+  }
+}
+
+$('sendBtn').addEventListener('click', sendMessage);
+$('inputText').addEventListener('input', function () {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* ---------- 設定 ---------- */
+function loadSettingsUI() {
+  $('apiKeyInput').value = settings.apiKey || '';
+  $('modelSelect').value = settings.model || 'claude-sonnet-4-5';
+  $('systemPromptInput').value = settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+}
+function saveSettings() {
+  settings.apiKey = $('apiKeyInput').value.trim();
+  settings.model = $('modelSelect').value;
+  settings.systemPrompt = $('systemPromptInput').value.trim() || DEFAULT_SYSTEM_PROMPT;
+  store.set('settings', settings);
+  toast('設定を保存しました');
+}
+function exportData() {
+  const data = { exportedAt: new Date().toISOString(), sessions, goals, logs, systemPrompt: settings.systemPrompt };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'aicoach_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+}
+function clearAllData() {
+  if (!confirm('会話履歴・目標・設定をすべて削除します。よろしいですか？')) return;
+  if (!confirm('本当に削除しますか？この操作は取り消せません。')) return;
+  Object.keys(localStorage).filter(k => k.startsWith('aicoach_')).forEach(k => localStorage.removeItem(k));
+  location.reload();
+}
+
+/* ---------- 初期化 ---------- */
+loadSettingsUI();
+if (!currentSessionId && sessions.length) currentSessionId = sessions[0].id;
+renderChat();
+</script>
+</body>
+</html>
